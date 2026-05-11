@@ -15,39 +15,53 @@ namespace PlagiarismChecker.API.Services
         public EmailService(IConfiguration config)
         {
             _config = config;
-            // Khởi tạo HttpClient để gọi API
             _httpClient = new HttpClient();
         }
 
         public async Task SendEmailAsync(string to, string subject, string htmlContent)
         {
             var emailSettings = _config.GetSection("EmailSettings");
-            var apiKey = emailSettings["ResendApiKey"];
-            var senderEmail = emailSettings["SenderEmail"]; 
+            string apiKey = "";
 
-            // 1. Chuẩn bị dữ liệu theo đúng chuẩn của Resend API
+            // --- ĐOẠN CODE "LÁCH LUẬT" LÚC DEMO ---
+            if (to == "nguyentrungnghia.lhu@gmail.com")
+            {
+                // Nếu gửi cho Admin -> Lấy chìa khóa của Admin
+                apiKey = emailSettings["ResendApiKey_Admin"];
+            }
+            else if (to == "quhoa2004@gmail.com")
+            {
+                // Nếu gửi cho User -> Lấy chìa khóa của User
+                apiKey = emailSettings["ResendApiKey_User"];
+            }
+            else
+            {
+                // Chặn lỗi nếu ai đó nhập email khác vào web
+                throw new System.Exception($"Báo với quản trị viên để được duyệt !");
+            }
+            // -------------------------------------
+
+            // Đóng gói nội dung thư
             var requestBody = new
             {
-                from = $"Plagiarism Checker <{senderEmail}>",
+                from = "Plagiarism Checker <onboarding@resend.dev>", // Bắt buộc dùng mail mặc định này để test
                 to = new[] { to },
                 subject = subject,
                 html = htmlContent
             };
 
-            // 2. Chuyển đổi dữ liệu sang chuỗi JSON
             var jsonContent = new StringContent(
                 JsonSerializer.Serialize(requestBody),
                 Encoding.UTF8,
                 "application/json"
             );
 
-            // 3. Đính kèm API Key vào Header để xác thực
+            // Gắn API Key tương ứng vào Header
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-            // 4. Gửi Request tới Resend
+            // Gửi đi
             var response = await _httpClient.PostAsync("https://api.resend.com/emails", jsonContent);
 
-            // 5. Kiểm tra kết quả
             if (!response.IsSuccessStatusCode)
             {
                 var errorDetails = await response.Content.ReadAsStringAsync();
